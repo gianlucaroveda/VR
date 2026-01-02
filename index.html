@@ -1,129 +1,32 @@
 <!DOCTYPE html>
-<html lang="it">
-<head>
-<meta charset="utf-8">
-<title>VR Cube - WebXR puro</title>
-<style>
-  body { margin: 0; overflow: hidden; }
-  button {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    padding: 10px;
-    font-size: 16px;
-    z-index: 100;
-  }
-</style>
-</head>
-<body>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>VR Object Explorer - Gemini</title>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.1.0/dist/aframe-extras.min.js"></script>
+  </head>
+  <body>
+    <a-scene>
+      <a-sky color="#222"></a-sky>
+      <a-grid></a-grid>
 
-<button id="enterVR">Entra in VR</button>
+      <a-box 
+        position="0 1.5 -3" 
+        rotation="0 45 0" 
+        color="#4CC3D9" 
+        shadow
+        animation="property: position; to: 0 1.7 -3; dir: alternate; dur: 2000; loop: true; easing: easeInOutSine">
+      </a-box>
 
-<script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.158/build/three.module.js';
-
-// --- SCENA ---
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x202020);
-
-// --- CAMERA e PLAYER RIG ---
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 100);
-const player = new THREE.Group();
-player.add(camera);
-scene.add(player);
-
-// --- RENDERER ---
-const renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.xr.enabled = true;
-document.body.appendChild(renderer.domElement);
-
-// --- LUCI ---
-scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1));
-
-// --- OGGETTO ---
-const cube = new THREE.Mesh(
-  new THREE.BoxGeometry(1,1,1),
-  new THREE.MeshStandardMaterial({color:0x00ffcc})
-);
-cube.position.set(0,1.6,-2);
-scene.add(cube);
-
-// --- VR SESSION ---
-let xrSession = null;
-const enterVRButton = document.getElementById('enterVR');
-
-enterVRButton.addEventListener('click', async () => {
-  if(navigator.xr){
-    try{
-      xrSession = await navigator.xr.requestSession('immersive-vr');
-      renderer.xr.setSession(xrSession);
-      console.log('VR session attiva!');
-    }catch(e){
-      console.error('Impossibile avviare VR:', e);
-    }
-  }else{
-    alert('WebXR non supportato!');
-  }
-});
-
-// --- MOVIMENTO ---
-const moveSpeed = 0.05;
-let lastBState = false;
-
-// --- ANIMAZIONE ---
-renderer.setAnimationLoop(() => {
-  // cubo rotante
-  cube.rotation.x += 0.01;
-  cube.rotation.y += 0.01;
-
-  if(xrSession){
-    for(const source of xrSession.inputSources){
-      if(!source.gamepad) continue;
-
-      const gp = source.gamepad;
-
-      // --- MOVIMENTO STICK SINISTRO ---
-      const xAxis = gp.axes[2] ?? gp.axes[0]; // orizzontale
-      const yAxis = gp.axes[3] ?? gp.axes[1]; // verticale
-
-      // avanti/indietro e destra/sinistra rispetto alla camera
-      const dir = new THREE.Vector3();
-      camera.getWorldDirection(dir);
-      dir.y = 0;
-      dir.normalize();
-      const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0,1,0));
-
-      player.position.add(dir.multiplyScalar(-yAxis * moveSpeed));
-      player.position.add(right.multiplyScalar(xAxis * moveSpeed));
-
-      // --- ESCI VR con B ---
-      const bPressed = gp.buttons[1]?.pressed;
-      if(bPressed && !lastBState){
-        xrSession.end();
-        console.log('Sessione VR terminata');
-      }
-      lastBState = bPressed;
-
-      // --- LOG DEBUG ---
-      console.log(
-        source.handedness,
-        'axes:', gp.axes.map(a => a.toFixed(2)),
-        'buttons:', gp.buttons.map(b => b.pressed)
-      );
-    }
-  }
-
-  renderer.render(scene, camera);
-});
-
-// --- RESIZE ---
-window.addEventListener('resize', ()=>{
-  camera.aspect = window.innerWidth/window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
-</script>
-
-</body>
+      <a-entity id="rig" movement-controls="controls: gamepad, keyboard; speed: 0.2">
+        <a-entity camera position="0 1.6 0" look-controls>
+        </a-entity>
+        
+        <a-entity oculus-touch-controls="hand: left"></a-entity>
+        <a-entity oculus-touch-controls="hand: right"></a-entity>
+      </a-entity>
+      
+    </a-scene>
+  </body>
 </html>
