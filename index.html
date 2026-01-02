@@ -15,97 +15,84 @@
 <script type="module">
   import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.158/build/three.module.js';
   import { VRButton } from 'https://cdn.jsdelivr.net/npm/three@0.158/examples/jsm/webxr/VRButton.js';
-  import { XRControllerModelFactory } from 'https://cdn.jsdelivr.net/npm/three@0.158/examples/jsm/webxr/XRControllerModelFactory.js';
 
-  /* ---------------- SCENA ---------------- */
+  // SCENA
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x202020);
 
-  /* ---------------- CAMERA + PLAYER ---------------- */
-  const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
+  // CAMERA
+  const camera = new THREE.PerspectiveCamera(
+    70,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    100
+  );
+  camera.position.set(0, 1.6, 3);
 
-  const player = new THREE.Group();
-  player.add(camera);
-  scene.add(player);
-
-  /* ---------------- RENDERER ---------------- */
+  // RENDERER
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.xr.enabled = true;
   document.body.appendChild(renderer.domElement);
   document.body.appendChild(VRButton.createButton(renderer));
 
-  /* ---------------- LUCI ---------------- */
+  // LUCI
   scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1));
 
-  /* ---------------- OGGETTO ---------------- */
+  // CUBO
   const cube = new THREE.Mesh(
     new THREE.BoxGeometry(1, 1, 1),
-    new THREE.MeshStandardMaterial({ color: 0xff00cc })
+    new THREE.MeshStandardMaterial({ color: 0x00ffcc })
   );
   cube.position.set(0, 1.6, -2);
   scene.add(cube);
 
-  /* ---------------- CONTROLLERS VISIBILI ---------------- */
-  const controllerModelFactory = new XRControllerModelFactory();
+  // CONTROLLERS BASE (NESSUN MODELLO)
+  const controller0 = renderer.xr.getController(0);
+  const controller1 = renderer.xr.getController(1);
+  scene.add(controller0, controller1);
 
-  const controllerGrip1 = renderer.xr.getControllerGrip(0);
-  controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
-  scene.add(controllerGrip1);
+  let logged = false;
 
-  const controllerGrip2 = renderer.xr.getControllerGrip(1);
-  controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
-  scene.add(controllerGrip2);
-
-  /* ---------------- MOVIMENTO ---------------- */
-  const speed = 0.06;
-  let lastBState = false;
-
+  // ANIMAZIONE
   renderer.setAnimationLoop(() => {
 
     cube.rotation.x += 0.01;
     cube.rotation.y += 0.01;
 
     const session = renderer.xr.getSession();
-    if (session) {
+    if (session && !logged) {
+      console.log('XR session attiva');
 
+      for (const source of session.inputSources) {
+        console.log('InputSource:', source.handedness, source);
+        if (source.gamepad) {
+          console.log('→ Gamepad:', source.gamepad);
+        }
+      }
+      logged = true;
+    }
+
+    // LOG CONTINUO ANALOGICI (sinistro)
+    if (session) {
       for (const source of session.inputSources) {
         if (!source.gamepad || source.handedness !== 'left') continue;
 
         const gp = source.gamepad;
 
-        // ANALOGICO SINISTRO
-        const xAxis = gp.axes[2] ?? gp.axes[0];
-        const yAxis = gp.axes[3] ?? gp.axes[1];
-
-        const moveX = xAxis * speed;
-        const moveZ = yAxis * speed;
-
-        const dir = new THREE.Vector3();
-        camera.getWorldDirection(dir);
-        dir.y = 0;
-        dir.normalize();
-
-        const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0));
-
-        player.position.add(dir.multiplyScalar(-moveZ));
-        player.position.add(right.multiplyScalar(moveX));
-
-        // PULSANTE B → EXIT VR
-        const bPressed = gp.buttons[1]?.pressed;
-
-        if (bPressed && !lastBState) {
-          session.end();
-        }
-
-        lastBState = bPressed;
+        console.log(
+          'axes:',
+          gp.axes.map(a => a.toFixed(2)),
+          'buttons:',
+          gp.buttons.map(b => b.pressed)
+        );
       }
     }
 
     renderer.render(scene, camera);
   });
 
-  /* ---------------- RESIZE ---------------- */
+  // RESIZE
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
