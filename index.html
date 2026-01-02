@@ -15,31 +15,30 @@
 <script type="module">
   import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.158/build/three.module.js';
   import { VRButton } from 'https://cdn.jsdelivr.net/npm/three@0.158/examples/jsm/webxr/VRButton.js';
+  import { XRControllerModelFactory } from 'https://cdn.jsdelivr.net/npm/three@0.158/examples/jsm/webxr/XRControllerModelFactory.js';
 
-  // SCENA
+  /* ---------------- SCENA ---------------- */
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x202020);
 
-  // CAMERA
+  /* ---------------- CAMERA + PLAYER ---------------- */
   const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
 
-  // PLAYER RIG
   const player = new THREE.Group();
-  player.position.set(0, 0, 3);
   player.add(camera);
   scene.add(player);
 
-  // RENDERER
+  /* ---------------- RENDERER ---------------- */
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.xr.enabled = true;
   document.body.appendChild(renderer.domElement);
   document.body.appendChild(VRButton.createButton(renderer));
 
-  // LUCI
+  /* ---------------- LUCI ---------------- */
   scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1));
 
-  // CUBO
+  /* ---------------- OGGETTO ---------------- */
   const cube = new THREE.Mesh(
     new THREE.BoxGeometry(1, 1, 1),
     new THREE.MeshStandardMaterial({ color: 0x00ffcc })
@@ -47,48 +46,66 @@
   cube.position.set(0, 1.6, -2);
   scene.add(cube);
 
-  // CONTROLLERS
-  const controller1 = renderer.xr.getController(0);
-  const controller2 = renderer.xr.getController(1);
-  scene.add(controller1, controller2);
+  /* ---------------- CONTROLLERS VISIBILI ---------------- */
+  const controllerModelFactory = new XRControllerModelFactory();
 
-  // MOVIMENTO
-  const speed = 0.05;
-  let moveX = 0;
-  let moveZ = 0;
+  const controllerGrip1 = renderer.xr.getControllerGrip(0);
+  controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
+  scene.add(controllerGrip1);
 
-  controller1.addEventListener('connected', (e) => {
-    controller1.gamepad = e.data.gamepad;
-  });
+  const controllerGrip2 = renderer.xr.getControllerGrip(1);
+  controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
+  scene.add(controllerGrip2);
+
+  /* ---------------- MOVIMENTO ---------------- */
+  const speed = 0.06;
+  let lastBState = false;
 
   renderer.setAnimationLoop(() => {
-    // ROTAZIONE CUBO
+
     cube.rotation.x += 0.01;
     cube.rotation.y += 0.01;
 
-    // INPUT JOYSTICK SINISTRO
-    if (controller1.gamepad) {
-      const [x, y] = controller1.gamepad.axes;
+    const session = renderer.xr.getSession();
+    if (session) {
 
-      moveX = x * speed;
-      moveZ = y * speed;
+      for (const source of session.inputSources) {
+        if (!source.gamepad || source.handedness !== 'left') continue;
 
-      // direzione rispetto allo sguardo
-      const direction = new THREE.Vector3();
-      camera.getWorldDirection(direction);
-      direction.y = 0;
-      direction.normalize();
+        const gp = source.gamepad;
 
-      const right = new THREE.Vector3().crossVectors(direction, new THREE.Vector3(0, 1, 0));
+        // ANALOGICO SINISTRO
+        const xAxis = gp.axes[2] ?? gp.axes[0];
+        const yAxis = gp.axes[3] ?? gp.axes[1];
 
-      player.position.add(direction.multiplyScalar(-moveZ));
-      player.position.add(right.multiplyScalar(moveX));
+        const moveX = xAxis * speed;
+        const moveZ = yAxis * speed;
+
+        const dir = new THREE.Vector3();
+        camera.getWorldDirection(dir);
+        dir.y = 0;
+        dir.normalize();
+
+        const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0));
+
+        player.position.add(dir.multiplyScalar(-moveZ));
+        player.position.add(right.multiplyScalar(moveX));
+
+        // PULSANTE B → EXIT VR
+        const bPressed = gp.buttons[1]?.pressed;
+
+        if (bPressed && !lastBState) {
+          session.end();
+        }
+
+        lastBState = bPressed;
+      }
     }
 
     renderer.render(scene, camera);
   });
 
-  // RESIZE
+  /* ---------------- RESIZE ---------------- */
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -96,3 +113,5 @@
   });
 </script>
 
+</body>
+</html>
