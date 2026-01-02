@@ -2,27 +2,32 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>VR Object Explorer - Gemini</title>
+    <title>VR Model Explorer - Gemini</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.1.0/dist/aframe-extras.min.js"></script>
   </head>
   <body>
-    <a-scene>
-      <a-sky color="#222"></a-sky>
+    <a-scene shadow="type: pcfsoft">
+      
+      <a-assets>
+        <a-asset-item id="modello-3d" src="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb"></a-asset-item>
+      </a-assets>
+
+      <a-sky color="#111"></a-sky>
       <a-grid></a-grid>
 
-      <a-box 
-        position="0 1.5 -3" 
-        rotation="0 45 0" 
-        color="#4CC3D9" 
-        shadow
-        animation="property: position; to: 0 1.7 -3; dir: alternate; dur: 2000; loop: true; easing: easeInOutSine">
-      </a-box>
+      <a-entity 
+        gltf-model="mo1.glb" 
+        position="0 0 -1" 
+        scale="2 2 2"
+        rotation="0 0 0">
+      </a-entity>
+
+      <a-entity light="type: ambient; intensity: 0.5;"></a-entity>
+      <a-entity light="type: directional; intensity: 0.8; castShadow: true" position="-1 2 1"></a-entity>
 
       <a-entity id="rig" movement-controls="controls: gamepad, keyboard; speed: 0.2">
-        <a-entity camera position="0 1.6 0" look-controls>
-        </a-entity>
-        
+        <a-entity camera position="0 1.6 0" look-controls></a-entity>
         <a-entity oculus-touch-controls="hand: left"></a-entity>
         <a-entity oculus-touch-controls="hand: right"></a-entity>
       </a-entity>
