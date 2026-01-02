@@ -1,117 +1,111 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="utf-8" />
-  <title>VR Cube - WebXR puro</title>
-  <style>
-    body { margin: 0; overflow: hidden; }
-    canvas { display: block; }
-  </style>
+<meta charset="utf-8">
+<title>VR Cube - WebXR puro</title>
+<style>
+  body { margin: 0; overflow: hidden; }
+  button {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    padding: 10px;
+    font-size: 16px;
+    z-index: 100;
+  }
+</style>
 </head>
 <body>
+
+<button id="enterVR">Entra in VR</button>
 
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.158/build/three.module.js';
 
-// SCENA
+// --- SCENA ---
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x202020);
 
-// CAMERA
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.set(0, 1.6, 3);
-
-// RENDERER
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.xr.enabled = true;
-document.body.appendChild(renderer.domElement);
-
-// LUCE
-scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1));
-
-// CUBO
-const cube = new THREE.Mesh(
-  new THREE.BoxGeometry(1, 1, 1),
-  new THREE.MeshStandardMaterial({ color: 0x00ffcc })
-);
-cube.position.set(0, 1.6, -2);
-scene.add(cube);
-
-// ---------------- WEBXR PURA ----------------
-
-// Button per entrare in VR
-const enterVRButton = document.createElement('button');
-enterVRButton.style.position = 'absolute';
-enterVRButton.style.top = '20px';
-enterVRButton.style.left = '20px';
-enterVRButton.style.padding = '10px';
-enterVRButton.textContent = 'Entra in VR';
-document.body.appendChild(enterVRButton);
-
-let xrSession = null;
-
-enterVRButton.addEventListener('click', async () => {
-  if (navigator.xr) {
-    try {
-      xrSession = await navigator.xr.requestSession('immersive-vr');
-      renderer.xr.setSession(xrSession);
-      console.log('VR session attiva!');
-    } catch (e) {
-      console.error('Impossibile avviare sessione VR:', e);
-    }
-  } else {
-    alert('WebXR non supportato in questo browser.');
-  }
-});
-// PLAYER RIG
+// --- CAMERA e PLAYER RIG ---
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 100);
 const player = new THREE.Group();
 player.add(camera);
 scene.add(player);
 
-// Velocità movimento
-const moveSpeed = 0.05;
+// --- RENDERER ---
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.xr.enabled = true;
+document.body.appendChild(renderer.domElement);
 
-// Per ricordare pulsante B premuto
+// --- LUCI ---
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1));
+
+// --- OGGETTO ---
+const cube = new THREE.Mesh(
+  new THREE.BoxGeometry(1,1,1),
+  new THREE.MeshStandardMaterial({color:0x00ffcc})
+);
+cube.position.set(0,1.6,-2);
+scene.add(cube);
+
+// --- VR SESSION ---
+let xrSession = null;
+const enterVRButton = document.getElementById('enterVR');
+
+enterVRButton.addEventListener('click', async () => {
+  if(navigator.xr){
+    try{
+      xrSession = await navigator.xr.requestSession('immersive-vr');
+      renderer.xr.setSession(xrSession);
+      console.log('VR session attiva!');
+    }catch(e){
+      console.error('Impossibile avviare VR:', e);
+    }
+  }else{
+    alert('WebXR non supportato!');
+  }
+});
+
+// --- MOVIMENTO ---
+const moveSpeed = 0.05;
 let lastBState = false;
 
-// ANIMAZIONE
+// --- ANIMAZIONE ---
 renderer.setAnimationLoop(() => {
+  // cubo rotante
   cube.rotation.x += 0.01;
   cube.rotation.y += 0.01;
 
-  if (xrSession) {
-    for (const source of xrSession.inputSources) {
-      if (!source.gamepad) continue;
+  if(xrSession){
+    for(const source of xrSession.inputSources){
+      if(!source.gamepad) continue;
 
       const gp = source.gamepad;
 
       // --- MOVIMENTO STICK SINISTRO ---
-      // Su/giù → yAxis
-      // Destra/sinistra → xAxis
-      const xAxis = gp.axes[2] ?? gp.axes[0]; // sinistro orizzontale
-      const yAxis = gp.axes[3] ?? gp.axes[1]; // sinistro verticale
+      const xAxis = gp.axes[2] ?? gp.axes[0]; // orizzontale
+      const yAxis = gp.axes[3] ?? gp.axes[1]; // verticale
 
-      // Direzione avanti/indietro rispetto allo sguardo
+      // avanti/indietro e destra/sinistra rispetto alla camera
       const dir = new THREE.Vector3();
       camera.getWorldDirection(dir);
       dir.y = 0;
       dir.normalize();
+      const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0,1,0));
 
-      const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0));
-
-      // Aggiorna posizione player
       player.position.add(dir.multiplyScalar(-yAxis * moveSpeed));
       player.position.add(right.multiplyScalar(xAxis * moveSpeed));
 
-      // --- ESCI VR CON PULSANTE B ---
+      // --- ESCI VR con B ---
       const bPressed = gp.buttons[1]?.pressed;
-      if (bPressed && !lastBState) {
+      if(bPressed && !lastBState){
         xrSession.end();
+        console.log('Sessione VR terminata');
       }
       lastBState = bPressed;
 
-      // --- DEBUG LOG ---
+      // --- LOG DEBUG ---
       console.log(
         source.handedness,
         'axes:', gp.axes.map(a => a.toFixed(2)),
@@ -123,9 +117,9 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
 });
 
-// ---------------- RESIZE ----------------
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+// --- RESIZE ---
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
