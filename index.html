@@ -1,3 +1,17 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <title>VR Cube</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+
 <script type="module">
   import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.158/build/three.module.js';
   import { VRButton } from 'https://cdn.jsdelivr.net/npm/three@0.158/examples/jsm/webxr/VRButton.js';
@@ -7,16 +21,11 @@
   scene.background = new THREE.Color(0x202020);
 
   // CAMERA
-  const camera = new THREE.PerspectiveCamera(
-    70,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    100
-  );
-  camera.position.set(0, 1.6, 0);
+  const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
 
-  // PLAYER (contenitore della camera)
+  // PLAYER RIG
   const player = new THREE.Group();
+  player.position.set(0, 0, 3);
   player.add(camera);
   scene.add(player);
 
@@ -35,49 +44,45 @@
     new THREE.BoxGeometry(1, 1, 1),
     new THREE.MeshStandardMaterial({ color: 0x00ffcc })
   );
-  cube.position.set(0, 1.6, -3);
+  cube.position.set(0, 1.6, -2);
   scene.add(cube);
 
   // CONTROLLERS
-  const controller = renderer.xr.getController(0);
-  scene.add(controller);
+  const controller1 = renderer.xr.getController(0);
+  const controller2 = renderer.xr.getController(1);
+  scene.add(controller1, controller2);
 
-  // PARAMETRI MOVIMENTO
+  // MOVIMENTO
   const speed = 0.05;
-  const direction = new THREE.Vector3();
-  const rotation = new THREE.Euler(0, 0, 0, 'YXZ');
+  let moveX = 0;
+  let moveZ = 0;
 
-  // LOOP VR
+  controller1.addEventListener('connected', (e) => {
+    controller1.gamepad = e.data.gamepad;
+  });
+
   renderer.setAnimationLoop(() => {
-
     // ROTAZIONE CUBO
     cube.rotation.x += 0.01;
     cube.rotation.y += 0.01;
 
-    // INPUT CONTROLLER
-    const session = renderer.xr.getSession();
-    if (session) {
-      for (const source of session.inputSources) {
-        if (source.gamepad && source.handedness === 'left') {
-          const [xAxis, yAxis] = source.gamepad.axes;
+    // INPUT JOYSTICK SINISTRO
+    if (controller1.gamepad) {
+      const [x, y] = controller1.gamepad.axes;
 
-          // direzione basata sulla rotazione della testa
-          rotation.setFromQuaternion(camera.quaternion);
-          direction.set(0, 0, -1).applyEuler(rotation);
-          direction.y = 0;
-          direction.normalize();
+      moveX = x * speed;
+      moveZ = y * speed;
 
-          // avanti / indietro
-          player.position.addScaledVector(direction, -yAxis * speed);
+      // direzione rispetto allo sguardo
+      const direction = new THREE.Vector3();
+      camera.getWorldDirection(direction);
+      direction.y = 0;
+      direction.normalize();
 
-          // strafe
-          const side = new THREE.Vector3()
-            .crossVectors(camera.up, direction)
-            .normalize();
+      const right = new THREE.Vector3().crossVectors(direction, new THREE.Vector3(0, 1, 0));
 
-          player.position.addScaledVector(side, xAxis * speed);
-        }
-      }
+      player.position.add(direction.multiplyScalar(-moveZ));
+      player.position.add(right.multiplyScalar(moveX));
     }
 
     renderer.render(scene, camera);
@@ -90,3 +95,4 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 </script>
+
